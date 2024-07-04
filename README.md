@@ -21,6 +21,7 @@
     - `1,1`は、拘束条件。`1`は拘束、`0`は拘束なしを意味する。
 - `op.nDMaterial('PM4Sand', 1, D_r, G_o, h_po, Den, P_atm, h_o, e_max, e_min, n_b, n_d, A_do, z_max, c_z, c_e, phi_cv, nu, g_degr, c_dr, c_kaf, Q_bolt, R_bolt, m_par, F_sed, p_sed)`について
     - `op.nDMaterial()`は、構成則を設定する関数
+        - nDMaterialは、n dimensional materialの略？
     - `PM4Sand`以外にも多くの構成則が使用可能
         - [参考](https://openseespydoc.readthedocs.io/en/latest/src/ndMaterial.html)
     - `1`は、材料のID。整数でないといけない
@@ -32,7 +33,96 @@
         - `P_atm`は、大気圧
         - (以下省略)
 - `op.element('quad', 1, 1, 2, 3, 4, 1.0, 'PlaneStrain', 1, 0.0, rho, 0.0, -9.81)`について
-        - 
-
-
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/quad.html)
+    - `op.element()`は、要素を定義する関数
+    - `quad`は、要素のタイプ。四角形要素を指定
+        - 例えば他には`truss`や`beamColumn`などがある
+    - `1`は、要素のID
+    - `1,2,3,4`は、要素を構成する節点のID
+    - `1.0`は、要素の厚さ
+    - `PlaneStrain`は、要素のタイプ。平面ひずみを指定
+        - 他には`PlaneStress`がある
+    - `1`は、nDMaterialで定義した材料のID
+    - これ以降はoptionalな変数
+        - `0.0`は、surface pressure
+        - `rho`は、要素の質量密度
+            - `0.0, -9.81`は、constant body forces defined in the isoparametric domain
 - `op.timeSeries('Linear', 1)`について
+    - `op.timeSeries()`は、TimeSeriesオブジェクトを作成する関数。このオブジェクトは時刻と荷重ファクターを関連付ける。
+    - `Linear`は、TimeSeriesのタイプ。線形に増加する荷重ファクターを指定
+        - `1`は、TimeSeriesのID
+        - `factor`は、荷重ファクターの増加率
+        - `tStart`は、TimeSeriesの開始時刻
+        - 計算式は以下のようになる
+            - $\lambda = f(t) = factor * (t - tStart)$
+    - `Trig`は`Trigonometric`の意味で三角関数の波形を意味する
+        - 
+        - `op.timeSeries('Trig', tag, tStart, tEnd, period, '-factor', factor=1.0, '-shift', shift=0.0, '-zeroShift', zeroShift=0.0)`
+        - `tag`は、TimeSeriesのID
+        - `tStart`は、TimeSeriesの開始時刻
+        - `tEnd`は、TimeSeriesの終了時刻
+        - `period`は、周期
+        - `factor`は、荷重ファクターの増加率
+        - `shift`は、波形の位相シフト
+        - `zeroShift`は、波形の位相シフト。こちらは、$\lambda$の値から決める場合に使う
+        - 計算式は以下の通り
+            - $\lambda = f(t) = factor * sin(2\pi(t - tStart)/period + \phi)$
+                - ここで$ \phi = shift - \frac{period}{2\pi} * arcsin(zeroShift/factor) $
+
+- `op.pattern('Plain', 1, 1)`について
+    - This commnand allows the user to construct a LoadPattern object. Each plain load pattern is associated with a TimeSeries object and can contain multiple NodalLoads, ElementalLoads and SP_Constraint objects. The command to generate LoadPattern object contains in { } the commands to generate all the loads and the single-point constraints in the pattern. To construct a load pattern and populate it, the following command is used:
+    - `op.pattern()`は、LoadPatternオブジェクトを作成する関数。このオブジェクトは、TimeSeriesオブジェクトとLoadPatternオブジェクトを関連付ける。
+        - `Plain`は、LoadPatternのタイプ。簡単な荷重パターンを指定。
+        - `1`は、LoadPatternのID
+        - `1`は、TimeSeriesのID
+        - `can contain multiple NodalLoads, ElementalLoads and SP_Constraint objects`←この記述がよくわからない
+            - 
+- `op.load(1, 0.0, -rho * 9.81 * width * height / 4)`について
+    - `op.load()`は、節点に荷重を与える関数
+    - `1`は、節点のID
+    - `0.0`は、荷重のx成分
+    - `-rho * 9.81 * width * height / 4`は、荷重のy成分
+        - `rho`は、要素の質量密度
+        - `9.81`は、重力加速度
+        - `width`は、要素の幅
+        - `height`は、要素の高さ
+        - `/ 4`は、要素の四つの節点に均等に荷重を与えるため
+ここからが重要な気がする...
+- `op.system('BandGeneral')`
+    - `op.system()`は、解析のシステムを設定する関数
+        - [参考](https://openseespydoc.readthedocs.io/en/latest/src/system.html)
+    - `BandGeneral`は、バンド行列を用いた解法を指定
+- `op.numberer('Plain')`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/numberer.html)
+    - `op.numberer()`は、節点や自由度の番号付けを行う関数
+    - `Plain`は、通常の番号付けを指定
+- `op.constraints('Plain')`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/PlainConstraint.html)
+    - `op.constraints()`は、拘束条件を設定する関数
+    - `Plain`は、通常の拘束条件を指定
+- `op.integrator('Newmark', 0.5, 0.25)`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/integrator.html)
+    - `op.integrator()`は、積分法を設定する関数
+    - `Newmark`は、ニューマーク法を指定
+    - `0.5`は、$\gamma$の値
+    - `0.25`は、$\beta$の値
+- `op.algorithm('Newton')`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/algorithm.html)
+    - `op.algorithm()`は、解法アルゴリズムを設定する関数
+    - `Newton`は、ニュートン・ラプソン法を指定
+- `op.analysis('Transient')`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/analysis.html)
+    - `op.analysis()`は、解析の種類を設定する関数
+    - `Transient`は、静的解析ではない、過渡解析を指定。時間ステップは一定。
+- `op.recorder('Element', '-file', 'stress_strain.out', '-time', '-ele', 1, 'stress')`
+    - [参考](https://openseespydoc.readthedocs.io/en/latest/src/recorder.html)
+    - `op.recorder()`は、結果を記録する関数
+    - `Element`は、要素の結果を記録
+    - `-file`は、ファイル名を指定
+    - `stress_strain.out`は、ファイル名
+    - `-time`は、時間を記録
+    - `-ele`は、要素を指定
+    - `1`は、要素のID
+    - `stress`は、記録する結果の種類
+
+- 
