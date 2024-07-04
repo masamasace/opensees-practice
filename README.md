@@ -56,7 +56,6 @@
         - `tStart`は、TimeSeriesの開始時刻
         - 計算式は$\lambda = f(t) = factor * (t - tStart)$のようになる
     - `Trig`は`Trigonometric`の意味で三角関数の波形を意味する
-        - 
         - `op.timeSeries('Trig', tag, tStart, tEnd, period, '-factor', factor=1.0, '-shift', shift=0.0, '-zeroShift', zeroShift=0.0)`
         - `tag`は、TimeSeriesのID
         - `tStart`は、TimeSeriesの開始時刻
