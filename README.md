@@ -4,6 +4,7 @@
 
 - 目標：OpenseesPyで、単純せん断試験のシミュレーションを行う
 
+### 現状のコード(UCU_test.py)のざっとした説明
 - `op.wipe()`はなぜ必要？
     - `op.wipe()`は、OpenseesPyのメモリをクリアする関数
     - これを実行しないと、前回の解析結果が残ってしまう
@@ -70,13 +71,11 @@
                 - ここで$ \phi = shift - \frac{period}{2\pi} * arcsin(zeroShift/factor) $
 
 - `op.pattern('Plain', 1, 1)`について
-    - This commnand allows the user to construct a LoadPattern object. Each plain load pattern is associated with a TimeSeries object and can contain multiple NodalLoads, ElementalLoads and SP_Constraint objects. The command to generate LoadPattern object contains in { } the commands to generate all the loads and the single-point constraints in the pattern. To construct a load pattern and populate it, the following command is used:
     - `op.pattern()`は、LoadPatternオブジェクトを作成する関数。このオブジェクトは、TimeSeriesオブジェクトとLoadPatternオブジェクトを関連付ける。
         - `Plain`は、LoadPatternのタイプ。簡単な荷重パターンを指定。
         - `1`は、LoadPatternのID
         - `1`は、TimeSeriesのID
         - `can contain multiple NodalLoads, ElementalLoads and SP_Constraint objects`←この記述がよくわからない
-            - 
 - `op.load(1, 0.0, -rho * 9.81 * width * height / 4)`について
     - `op.load()`は、節点に荷重を与える関数
     - `1`は、節点のID
@@ -125,4 +124,34 @@
     - `1`は、要素のID
     - `stress`は、記録する結果の種類
 
-- 
+
+### 他のサンプルコードを見てみる
+- [PM4Sandを用いたpythonスクリプト](https://github.com/zhuminjie/OpenSeesPyDoc/blob/master/pyExamples/PM4Sand_Cyc_Cal.py)
+    - 色々参考になる
+    - ざっとした構造は以下の通り。**太字**は、初期コードで考慮していなかった部分
+        - Line 28から75まで：モデルのパラメータの設定
+            - PM4Sandのオプショナルパラメータまでしっかりと設定されているのが印象的。
+        - Line 78から86まで：レイリー減衰のパラメータの設定
+        - Line 93：op.model()の設定
+            - 次元数は2、自由度は3
+        - Line 96から119までは接点と境界条件の設定
+            - op.fix()でなぜか3次元目までの拘束条件を設定している
+        - **Line 120：op.equalDOF()で節点3と4の変位を等しくする**
+        - Line 128でop.nDMaterial()でPM4Sandの設定
+        - **Line 131から134で、op.element()の設定**
+            - ここで用いているのは`quad`ではなく、`SSPquadUP`という要素
+            - `SSPquad`の拡張型
+                - `SSPquad`は、四角形要素の中でも特に平面ひずみを考慮したもの
+                    - `SSP`はStablized Single Pointの略
+                    - 以下ドキュメントからの引用。
+                        >  The SSPquad element is a four-node quadrilateral element using physically stabilized single-point integration (SSP –> Stabilized Single Point). The stabilization incorporates an assumed strain field in which the volumetric dilation and the shear strain associated with the the hourglass modes are zero, resulting in an element which is free from volumetric and shear locking. The elimination of shear locking results in greater coarse mesh accuracy in bending dominated problems, and the elimination of volumetric locking improves accuracy in nearly-incompressible problems. Analysis times are generally faster than corresponding full integration elements. The formulation for this element is identical to the solid phase portion of the SSPquadUP element as described by McGann et al. (2012).
+                    - 意訳
+                        - SSPquad要素は、4つの節点を有する四辺形要素。この要素は物理的に安定である1点積分を用いている。この安定化は、アワーガラスモードに関連するダイレーションとせん断ひずみが0であるひずみ条件下を組み込み、体積およびせん断ロッキングを発生させない。せん断ロッキングをなくすことによって、曲げ支配問題において粗いメッシュの精度が向上し、体積ロッキングをなくすことによって、準非圧縮問題において精度が向上する。解析時間は通常、対応する完全積分要素よりも短い。この要素の公式は、McGannらによって説明されたSSPquadUP要素の固相部分と同一。
+            - それでは`SSPquadUP`は？
+                - 飽和された多孔質体の動的な平面ひずみ解析に利用される要素
+                - u-p formulationを用いている
+                - Biotならびに、それを拡張したZienkiewicz and Shiomiの論文に基づく
+                - TODO:ドキュメントと関連論文を読む
+
+                        
+
