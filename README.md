@@ -136,6 +136,7 @@
             - 次元数は2、自由度は3
         - Line 96から119までは接点と境界条件の設定
             - op.fix()でなぜか3次元目までの拘束条件を設定している
+                - 3次元目ではなく3自由度目(せん断変形)を初期状態では拘束するため
         - **Line 120：op.equalDOF()で節点3と4の変位を等しくする**
         - Line 128でop.nDMaterial()でPM4Sandの設定
         - **Line 131から134で、op.element()の設定**
@@ -152,6 +153,120 @@
                 - u-p formulationを用いている
                 - Biotならびに、それを拡張したZienkiewicz and Shiomiの論文に基づく
                 - TODO:ドキュメントと関連論文を読む
+        - Line 135から140はRecorderの設定
+        - Line 141から149は解析の設定
+            - 初期コードと若干異なる
+            - 以下引用
+            - > op.constraints('Transformation')
+              > op.test('NormDispIncr', 1.0e-5, 35, 1)
+              > op.algorithm('Newton')
+              > op.numberer('RCM')
+              > op.system('FullGeneral')
+              > op.integrator('Newmark', 5.0/6.0, 4.0/9.0)
+              > op.rayleigh(a1, a0, 0.0, 0.0) #modification
+              > op.analysis('Transient')
+            - `op.constraints('Transformation')`は、拘束条件を設定
+                - `Note`の欄には、拘束条件について注意が必要と書かれている。が、詳細はまだ理解できていない
+                    - [Noteへのリンク](https://openseespydoc.readthedocs.io/en/latest/src/TransformationMethod.html)
+            - `op.test('NormDispIncr', 1.0e-5, 35, 1)`は、収束条件を設定
+                - `NormDispIncr`は、変位の増分のノルムを収束条件として指定
+                - `1.0e-5`は、収束条件の許容誤差
+                - `35`は、最大反復回数
+                - `1`は、PrintFlagで、以下のような仕様になっている
+                    - 0: 何も出力しない
+                    - 1: test()が呼び出されるたびにノルムに関する情報を出力
+                    - 2: 成功したテストの最後にノルムと反復回数に関する情報を出力
+                    - 4: 各ステップでノルムと、$\Delta U$と$R(U)$のベクトルを出力
+                    - 5: 反復回数が最大反復回数に達した場合、エラーメッセージを出力して成功したテストを返す
+            - `op.algorithm('Newton')`は、解法アルゴリズムを設定
+            - `op.numberer('RCM')`は、節点や自由度の番号付けを行う
+                - `RCM`は、Reverse Cuthill-McKee法を指定
+                    - [Wikiへのリンク](https://ja.wikipedia.org/wiki/%E3%82%AB%E3%83%83%E3%83%88%E3%83%92%E3%83%AB%E3%83%BB%E3%83%9E%E3%82%AD%E3%83%BC%E6%B3%95)
+                - > 対称なパターンを持つ疎行列を帯幅（英語版）の小さい帯行列（英語版）の形に並べ替えるアルゴリズム
+            - `op.system('FullGeneral')`は、解析のシステムを設定
+                - `FullGeneral`は、一般的なフル行列を用いた解法を指定
+                - 公式Documentationではではあまり推奨されていない
+                    - メモリの使用量が多いため
+                - 逆に言えばメモリ使用量の削減手法があるということ
+            - `op.integrator('Newmark', 5.0/6.0, 4.0/9.0)`は、積分法を設定
+            - `op.rayleigh(a1, a0, 0.0, 0.0)`は、レイリー減衰の設定
+                - ここでは、$a_1$と$a_0$のみを設定
+                - レイリー減衰の計算式は以下の通り
+                    - Dは指定された剛性と質量比例の減衰行列
+                    - $D = \alpha_M M + \beta_K K + \beta_Kinit K_init + \beta_Kcomm K_comm$
+                        - $M$は質量行列
+                        - $K$は現時点での剛性行列
+                        - $K_init$は初期剛性行列
+                        - $K_comm$はcommitted stiffness matrix
+        - Line 154から167はLoading Patternの設定
+            - 以下コードの引用
+            - ```python
+              # create a plain load pattern with time series 1
+              op.timeSeries('Path', 1, '-values', 0, 1, 1, '-time', 0.0, 100.0, 1.0e10)
+              op.pattern("Plain", 1, 1, '-factor',1.0)
+              op.load(3, 0.0, pNode, 0.0) #apply vertical pressure at y direction
+              op.load(4, 0.0, pNode, 0.0)
+              op.updateMaterialStage('-material', 1, '-stage', 0)
+              op.analyze(100,1.0)
+              vDisp = op.nodeDisp(3,2)
+              b = op.eleResponse(1, 'stress') #b = [sigmaxx, sigmayy, sigmaxy]
+              print('shear stress is',b[2])
+              op.timeSeries('Path', 2, '-values', 1.0, 1.0, 1.0, '-time', 100.0, 80000.0, 1.0e10, '-factor', 1.0)
+              op.pattern('Plain', 2, 2,'-factor',1.0)
+              op.sp(3, 2, vDisp)
+              op.sp(4, 2, vDisp)
+              ```
+            - `op.timeSeries('Path', 1, '-values', 0, 1, 1, '-time', 0.0, 100.0, 1.0e10)`は、TimeSeriesの設定
+                - `Path`は、時刻とLoadFactorの関係性を2つの数字の組、あるいはそれを含んだリストで指定する
+                    - こっちのほうがわかりやすい...
+                - ファイルからのロードも可能
+                    - 実波形のインポートも可能！
+                - 指定した時刻におけるLoading Factorが存在しない場合は、内挿値を使用
+                - この場合の設定だと、時刻0から100までの間、Loading Factorが0から1まで線形に増加し、その後1.0e10の時間まで1が維持される。
+                    - 繰り返し載荷ではない？
+                        - 違うわ、これは鉛直載荷のための設定だ
+            - `op.pattern("Plain", 1, 1, '-factor',1.0)`は、LoadPatternの設定
+            - `op.load(3, 0.0, pNode, 0.0)`は、節点3に荷重を与える
+            - `op.updateMaterialStage('-material', 1, '-stage', 0)`は、材料のステージを更新
+                - ステージって何？
+                - [本家のHP](https://opensees.berkeley.edu/wiki/index.php/UpdateMaterialStage)にかかれていた
+                - `op.nDMaterial()`で設定した材料パラメータ(構成則)は`stage = 0`のときには適用されない。
+                    - 初期圧密、あるいは繰り返しせん断前の状態を再現するためのもの
+                - `0`：線形弾性。デフォルトではこれだから、実は明示する必要はない。
+                - `1`：塑性
+                - `2`：初期有効応力に依存した弾性
+            - `op.analyze(100,1.0)`は、解析を行う
+                - `100`は、解析ステップ数
+                - `1.0`は、時間ステップ
+            - `vDisp = op.nodeDisp(3,2)`は、節点3のy方向の変位を取得
+            - `b = op.eleResponse(1, 'stress')`は、要素1の応力を取得
+            - `op.timeSeries('Path', 2, '-values', 1.0, 1.0, 1.0, '-time', 100.0, 80000.0, 1.0e10, '-factor', 1.0)`は、繰り返しせん断用のTimeSeriesの設定
+                - こちらの設定は、時刻100からずっと1.0のLoading Factorを維持する
+            - `op.pattern('Plain', 2, 2,'-factor',1.0)`は、LoadPatternの設定
+                - ドキュメントを読むと、`'-factor'`は`'-fact'`ではないか？
+                - ただ、`'-fact'`を設定する意味がわからない
+            - `op.sp(3, 2, vDisp)`は、節点3の自由度2(y方向?)の変位をvDispで固定する
+                - なぜ応力でなく変位固定なのか？
+                - `sp`はsingle point constraintsの意味
+        - Line 169から172で非排水へ変更
+            - `op.remove('sp', i+1, 3)`
+                - 3は3自由度目なので、せん断変形？
+                - ようするにすべてのノードでせん断変形を可能にする？
+                - `op.fix(1, 1, 1, 1)`で`op.sp(1, 3, 0)`状態になっているため、このコマンドで拘束を解かないといけない
+        - Line 175から178で非排水状態にして要素が安定化するまで待つ
+            - 安定化したのち、せん断応力を取得
+        - Line 180で`material`の`stage`をスイッチ
+        - Line 191でパラメータの値を更新？
+            - コメントに書かれている内容を見ると、`Element`は内部のパラメータとして`FirstCall`と`Postshake`が用意されており、PM4SiltやPM4SandはそれをFlagとして、材料モデルの`A_do`と`z_max`の値を初期化?するよう。
+            - > `A_do : Optional, Dilatancy parameter, will be computed at the time of initialization if input value is negative`
+            - > `z_max : Optional, Fabric-dilatancy tensor parameter`
+
+                - [PM4SiltのWiki](https://openseespydoc.readthedocs.io/en/latest/src/PM4Silt.html)
+        - Line 193から199では材料モデルを変更後、もう一度安定化するまで待つ
+            - `op.setParameter('-val', 0.3, '-ele',1, 'poissonRatio', '1')`
+                - 要素番号1の`poissonRatio`の値を0.3に書き換えるという意味。
+                    - 一番最後の`1`はなんの意味を持つ？
+            
 
                         
 
