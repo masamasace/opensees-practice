@@ -1,8 +1,43 @@
-# OpenseesPy関連のメモ
+# OpenseesPy関連の学習記録
+
+## 最初に読んでおくべき内容
+
+### 公式関連の参考資料
+- [https://opensees.berkeley.edu/](https://opensees.berkeley.edu/)
+    - プロジェクトの公式ページ
+        - 登録してと書かれている
+        - ただ結構リンク切れが多い
+- [https://opensees.ist.berkeley.edu/wiki/index.php](https://opensees.ist.berkeley.edu/wiki/index.php?title=Main_Page)
+    - OpenseesのWiki
+    - 左側の`User Documentation`から、ユーザーマニュアルにアクセスできる
+- [https://opensees.github.io/OpenSeesDocumentation/](https://opensees.github.io/OpenSeesDocumentation/)
+    - Github Pagesで公開されているドキュメント
+    - 上記のWikiと内容が異なる？こちらのほうが扱いやすいイメージ
+- [https://github.com/OpenSees/OpenSees](https://github.com/OpenSees/OpenSees)
+    - Githubのリポジトリ
+    - ソースコードが公開されている
+    - 現時点(2024/07/06)でのバージョンは`3.6.0`
+- [https://openseespydoc.readthedocs.io/en/latest/](https://openseespydoc.readthedocs.io/en/latest/)
+    - OpenseesPyのドキュメント
+    - 作成者は[Mingjie ZHU氏](https://github.com/zhuminjie)
+- [https://github.com/zhuminjie/OpenSeesPy](https://github.com/zhuminjie/OpenSeesPy)
+    - 同じ作成者のMingjie ZHU氏が作成したOpenseesPyのリポジトリ
+    - こちらもソースコードが公開されているが、厳密には同じバージョンではない？
+        - 現時点(2024/07/06)でのバージョンは`3.6.0.3`となっている
+    - 現時点(2024/07/06)で本家`OpenSees`と複数のContributerが被っており、Contributionも活発であるので、開発中止の可能性は薄いだろう。
+        - [OpenseesPyのコントリビューション](https://github.com/zhuminjie/OpenSeesPy/graphs/contributors)
+        - [OpenSeesのコントリビューション](https://github.com/OpenSees/OpenSees/graphs/contributors)
+
+### 単位について
+- [ここ](https://opensees.berkeley.edu/OpenSees/manuals/usermanual/566.htm)を読むと、単位系については依拠しないと書かれている。
+    - Metricであろうが、Imperialであろうが、どちらでも使える
+
+
 
 ## 2024/07/06
 
-- 小目標：サンプルコードのわからなかった部分をソースコードから理解
+- 小目標1：サンプルコードのわからなかった部分をソースコードから理解
+- 小目標2：単一要素の液状化解析を行うコードを作成する
 
 ### 不明点
 
@@ -46,9 +81,10 @@
                 - この部分の記述はあいまい。
         - `PostShake`の場合は、現在の応力状態と累積ひずみを考慮した、砂のせん断剛性率と体積弾性係数の値を決定する。
 
+### 単位について
+- [ここ](https://opensees.berkeley.edu/OpenSees/manuals/usermanual/566.htm)を読むと、単位系については依拠しないと書かれている。
+    - Metricであろうが、Imperialであろうが、どちらでも使える
 
-                -  
-- 
 
 ## 2024/07/04
 
