@@ -8,6 +8,22 @@ import openseespy.opensees as op
 import matplotlib.pyplot as plt
 import pandas as pd
 
+############ Define functions ############
+def extract_stress_strain(stress, strain, disp, flag=False):
+    
+    prs_shear_stress = stress[2]
+    prs_mean_stress = (stress[0] + stress[1]) / 2
+    prs_shear_strain = strain[2]
+    prs_hol_dsip = disp
+    
+    if flag:
+        print('tau:', "{:<6.2f}".format(prs_shear_stress), 
+            'sigma:', "{:<6.2f}".format(prs_mean_stress), 
+            'gamma:', "{:<8.4f}".format(prs_shear_strain))
+    
+    return (prs_shear_stress, prs_mean_stress, prs_shear_strain, prs_hol_dsip)
+    
+
 ############ Define parameters ############
 
 # Element size
@@ -15,7 +31,7 @@ height = 1.0
 width = 1.0
 
 # Material parameters
-confining_pressure = -200
+sigma_c = -100
 
 rho = 1.42
 D_r = 0.5
@@ -43,6 +59,9 @@ a0 = a1 * omega1 * omega2
 
 # Shear loading parameters
 shear_wave_period = 0.1
+
+# Flags to export results
+flag_export_txt_under_load = False
 
 ############ Define model ############
 
@@ -110,15 +129,19 @@ op.integrator('Newmark', 0.5, 0.25)
 op.rayleigh(a1, a0, 0.0, 0.0)
 op.analysis('Transient')
 
-pNode = confining_pressure / 2
+############ Apply initial static load ############
 
 op.timeSeries('Path', 1, '-values', 0, 1, 1, '-time', 0, 100, 1.0e10)
 op.pattern('Plain', 1, 1, '-fact', 1.0)
-op.load(3, 0, pNode, 0)
-op.load(4, 0, pNode, 0)
+op.load(3, 0, sigma_c / 2, 0)
+op.load(4, 0, sigma_c / 2, 0)
+
+# Change its constitutive model to Linear Elastic one
 op.updateMaterialStage('-material', 1, '-stage', 0)
 
 op.analyze(100, 1)
+
+############ Make specimen undrained and wait for pore pressure to stabilize ############
 
 v_disp = op.nodeDisp(3, 2)
 op.timeSeries('Path', 2, '-values', 1, 1, 1, '-time', 100, 1000, 1.0e10)
@@ -132,88 +155,104 @@ for i in range(4):
 
 op.analyze(100, 1)
 
+# Change its constitutive model to PM4Sand
 op.updateMaterialStage('-material', 1, '-stage', 1)
+
+# The following command is needed to initialize the PM4Sand model
 op.setParameter('-val', 0, '-ele', 1, 'FirstCall', "1")
 
 op.analyze(100, 1)
 
 op.setParameter('-val', 0.3, '-ele', 1, 'poissonRatio', '1')
 
-devDisp = 0.03
-controlDisp = 1.1 * devDisp
-numCycle = 0.25
-Cycle_max = 10
-strain_in = 0.0001
+############ Perform cyclic simple shear test ############
+
+thres_hol_disp = 0.03
+limiting_hol_disp = 1.1 * thres_hol_disp
+prs_num_cycle = 0.25
+target_num_cycle = 10
+increment_strain = 0.0001
 CSR = 0.2
-sig_v0 = confining_pressure
 
-
-while (numCycle <= Cycle_max):
-
-    hDisp = op.nodeDisp(3, 1)
-    cur_time = op.getTime()
-    steps = controlDisp / strain_in
-    time_change = cur_time + steps
-
-    op.timeSeries('Path', 3, '-values', hDisp, controlDisp, controlDisp,
-                  '-time', cur_time, time_change, 1.0e10, '-factor', 1.0)
-    op.pattern('Plain', 3, 3, '-fact', 1.0)
-    op.sp(3, 1, 1.0)
-
-    b = op.eleResponse(1, 'stress')
-
-    while b[2] <= CSR*sig_v0*(-1.0):  # b[2] is the shear stress, sigmaxy
-        op.analyze(1, 1.0)
-        b = op.eleResponse(1, 'stress')
-        hDisp = op.nodeDisp(3, 1)
-        if hDisp >= devDisp:
-            print('loading break')
-            break
-
-    numCycle = numCycle + 0.25
-    hDisp = op.nodeDisp(3, 1)
-    cur_time = op.getTime()
-    op.remove('loadPattern', 3)
-    op.remove('timeSeries', 3)
-    op.remove('sp', 3, 1)
-
-    steps = (controlDisp+hDisp)/strain_in
-    time_change = cur_time + steps
-    op.timeSeries('Path', 3, '-values', hDisp, -1.0*controlDisp, -1.0 *
-                  controlDisp, '-time', cur_time, time_change, 1.0e10, '-factor', 1.0)
-    op.pattern('Plain', 3, 3)
-    op.sp(3, 1, 1.0)
-    while b[2] > CSR*sig_v0:
-        op.analyze(1, 1.0)
-        b = op.eleResponse(1, 'stress')
-        print('shear stress is', b[2])
-        hDisp = op.nodeDisp(3, 1)
-        if hDisp <= -1.0*devDisp:
-            print('unloading break')
-            break
-    numCycle = numCycle + 0.5
-    hDisp = op.nodeDisp(3, 1)
-    cur_time = op.getTime()
-    op.remove('loadPattern', 3)
-    op.remove('timeSeries', 3)
-    op.remove('sp', 3, 1)
+while (prs_num_cycle <= target_num_cycle):
 
     # impose 1/4 cycle
-    steps = (controlDisp+hDisp)/strain_in
-    op.timeSeries('Path', 3, '-values', hDisp, controlDisp, controlDisp,
-                  '-time', cur_time, time_change, 1.0e10, '-factor', 1.0)
+    prs_hol_dsip = op.nodeDisp(3, 1)
+    prs_time = op.getTime()
+    required_steps = limiting_hol_disp / increment_strain
+    time_change = prs_time + required_steps
+
+    op.timeSeries('Path', 3, '-values', prs_hol_dsip, limiting_hol_disp, limiting_hol_disp,
+                  '-time', prs_time, time_change, 1.0e10, '-factor', 1.0)
     op.pattern('Plain', 3, 3, '-fact', 1.0)
     op.sp(3, 1, 1.0)
-    while b[2] <= 0.0:  # b[2] is the shear stress, sigmaxy
+
+    prs_shear_stress, prs_mean_stress, prs_shear_strain, prs_hol_dsip = extract_stress_strain(
+        op.eleResponse(1, 'stress'), op.eleResponse(1, 'strain'),  op.nodeDisp(3, 1), flag_export_txt_under_load)
+
+    while prs_shear_stress <= -CSR * sigma_c:
         op.analyze(1, 1.0)
-        b = op.eleResponse(1, 'stress')
-        print('shear stress is', b[2])
-        hDisp = op.nodeDisp(3, 1)
-        if hDisp >= devDisp:
-            print('reloading break')
+        
+        prs_shear_stress, prs_mean_stress, prs_shear_strain, prs_hol_dsip = extract_stress_strain(
+            op.eleResponse(1, 'stress'), op.eleResponse(1, 'strain'),  op.nodeDisp(3, 1))
+        
+        if prs_hol_dsip >= thres_hol_disp:
             break
-    numCycle = numCycle + 0.25
-    print('Current Number of Cycle:', numCycle)
+    
+    print('Number of cycles:', prs_num_cycle)
+    
+    # impose 1/2 cycle from maximum shear stress to minimum shear stress
+    prs_num_cycle = prs_num_cycle + 0.5
+    prs_hol_dsip = op.nodeDisp(3, 1)
+    prs_time = op.getTime()
+    op.remove('loadPattern', 3)
+    op.remove('timeSeries', 3)
+    op.remove('sp', 3, 1)
+
+    required_steps = (limiting_hol_disp+prs_hol_dsip)/increment_strain
+    time_change = prs_time + required_steps
+    op.timeSeries('Path', 3, '-values', prs_hol_dsip, -1.0*limiting_hol_disp, -1.0 *
+                  limiting_hol_disp, '-time', prs_time, time_change, 1.0e10, '-factor', 1.0)
+    op.pattern('Plain', 3, 3)
+    op.sp(3, 1, 1.0)
+    
+    while prs_shear_stress > CSR * sigma_c or prs_hol_dsip <= -thres_hol_disp:
+        op.analyze(1, 1.0)
+        
+        prs_shear_stress, prs_mean_stress, prs_shear_strain, prs_hol_dsip = extract_stress_strain(
+            op.eleResponse(1, 'stress'), op.eleResponse(1, 'strain'),  op.nodeDisp(3, 1), flag_export_txt_under_load)
+        
+        if prs_hol_dsip <= -thres_hol_disp:
+            break
+        
+    print('Number of cycles:', prs_num_cycle)
+    
+    # impose 1/4 cycle
+    prs_num_cycle = prs_num_cycle + 0.25
+    prs_hol_dsip = op.nodeDisp(3, 1)
+    prs_time = op.getTime()
+    op.remove('loadPattern', 3)
+    op.remove('timeSeries', 3)
+    op.remove('sp', 3, 1)
+
+    required_steps = (limiting_hol_disp+prs_hol_dsip)/increment_strain
+    op.timeSeries('Path', 3, '-values', prs_hol_dsip, limiting_hol_disp, limiting_hol_disp,
+                  '-time', prs_time, time_change, 1.0e10, '-factor', 1.0)
+    op.pattern('Plain', 3, 3, '-fact', 1.0)
+    op.sp(3, 1, 1.0)
+    
+    while prs_shear_stress <= 0.0:
+        op.analyze(1, 1.0)
+        
+        prs_shear_stress, prs_mean_stress, prs_shear_strain, prs_hol_dsip = extract_stress_strain(
+            op.eleResponse(1, 'stress'), op.eleResponse(1, 'strain'),  op.nodeDisp(3, 1), flag_export_txt_under_load)
+        
+        if prs_hol_dsip >= thres_hol_disp:
+            break
+    
+    print('Number of cycles:', prs_num_cycle)
+        
+    prs_num_cycle = prs_num_cycle + 0.25
     op.remove('loadPattern', 3)
     op.remove('timeSeries', 3)
 
@@ -225,5 +264,6 @@ df_strain = pd.read_csv('CycStrain.txt', sep='\s+', header=None)
 
 fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 ax[0].plot(df_strain[3], df_stress[3])
+ax[1].plot(-(df_stress[1]+df_stress[2])/2, df_stress[3])
 
 plt.show()
