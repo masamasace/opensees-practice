@@ -1,5 +1,30 @@
 # OpenseesPy関連のメモ
 
+## 2024/07/06
+
+- 小目標：サンプルコードのわからなかった部分をソースコードから理解
+
+### 不明点
+
+- [参考にしたリンク](https://github.com/zhuminjie/OpenSeesPyDoc/blob/master/pyExamples/PM4Sand_Cyc_Cal.py)
+- Line 165: `op.pattern('Plain', 2, 2,'-factor',1.0)`
+    - Q1:`-factor`は`'-fact'`ではないか？
+    - Q2:`'-fact'`を設定する意味とは？
+- `op.setParameter('-val', 0, '-ele', 1, 'FirstCall', '1')`
+    - Q1:`FirstCall`は何を指定している？
+    - Q2:一番最後の`1`はなんの意味を持つ？
+- `op.sp(3, 1, 1.0)`
+    - Q1:なぜ3つ目の引数がfloat?
+- `SSPquadUP`について
+    - Q1:`SSPquadUP`はどのような要素か？
+    - Q2:そもそもElementとは何か？
+
+### ソースコードからの理解
+- `pip install openseespy`について
+    - `__init__.py`を見ると、プラットフォームによって、インポートするモジュールが変わるようになっている
+    - 例えば、`import openseespy.opensees as op`とすると、`openseespy/opensees.py`がインポートされる
+- 
+
 ## 2024/07/04
 
 - 目標：OpenseesPyで、単純せん断試験のシミュレーションを行う
@@ -154,15 +179,6 @@
         - Line 135から140はRecorderの設定
         - Line 141から149は解析の設定
             - 初期コードと若干異なる
-            - 以下引用
-            - > op.constraints('Transformation')
-              > op.test('NormDispIncr', 1.0e-5, 35, 1)
-              > op.algorithm('Newton')
-              > op.numberer('RCM')
-              > op.system('FullGeneral')
-              > op.integrator('Newmark', 5.0/6.0, 4.0/9.0)
-              > op.rayleigh(a1, a0, 0.0, 0.0) #modification
-              > op.analysis('Transient')
             - `op.constraints('Transformation')`は、拘束条件を設定
                 - `Note`の欄には、拘束条件について注意が必要と書かれている。が、詳細はまだ理解できていない
                     - [Noteへのリンク](https://openseespydoc.readthedocs.io/en/latest/src/TransformationMethod.html)
@@ -197,23 +213,6 @@
                         - $K_init$は初期剛性行列
                         - $K_comm$はcommitted stiffness matrix
         - Line 154から167はLoading Patternの設定
-            - 以下コードの引用
-            - ```python
-              # create a plain load pattern with time series 1
-              op.timeSeries('Path', 1, '-values', 0, 1, 1, '-time', 0.0, 100.0, 1.0e10)
-              op.pattern("Plain", 1, 1, '-factor',1.0)
-              op.load(3, 0.0, pNode, 0.0) #apply vertical pressure at y direction
-              op.load(4, 0.0, pNode, 0.0)
-              op.updateMaterialStage('-material', 1, '-stage', 0)
-              op.analyze(100,1.0)
-              vDisp = op.nodeDisp(3,2)
-              b = op.eleResponse(1, 'stress') #b = [sigmaxx, sigmayy, sigmaxy]
-              print('shear stress is',b[2])
-              op.timeSeries('Path', 2, '-values', 1.0, 1.0, 1.0, '-time', 100.0, 80000.0, 1.0e10, '-factor', 1.0)
-              op.pattern('Plain', 2, 2,'-factor',1.0)
-              op.sp(3, 2, vDisp)
-              op.sp(4, 2, vDisp)
-              ```
             - `op.timeSeries('Path', 1, '-values', 0, 1, 1, '-time', 0.0, 100.0, 1.0e10)`は、TimeSeriesの設定
                 - `Path`は、時刻とLoadFactorの関係性を2つの数字の組、あるいはそれを含んだリストで指定する
                     - こっちのほうがわかりやすい...
@@ -264,6 +263,18 @@
             - `op.setParameter('-val', 0.3, '-ele',1, 'poissonRatio', '1')`
                 - 要素番号1の`poissonRatio`の値を0.3に書き換えるという意味。
                     - 一番最後の`1`はなんの意味を持つ？
+        - Line 206から繰り返し載荷を開始
+            - `op.timeSeries('Path', 3,'-values', hDisp, controlDisp, controlDisp, '-time', cur_time, time_change, 1.0e10, '-factor', 1.0)`
+                - 線形増加？しかもひずみ速度一定の条件
+            - `op.pattern('Plain', 3, 3, '-fact', 1.0)`
+                - `-fact`ってなんだっけ？
+            - `op.sp(3, 1, 1.0)`
+                - 節点3のx方向の変位を固定
+                    - なぜ3つ目の引数がfloat?
+            - `while`文で規定のCSRに相当するせん断応力まで到達するまで解析を1ステップずつ進める
+            - 荷重が反転する際には`op.remove()`で、loading pattern、timeSeries、spを一旦削除
+                - spは削除しなくてもよいのでは？
+            - 以下荷重反転後は上記の繰り返し
             
 
                         
