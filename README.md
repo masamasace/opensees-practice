@@ -31,8 +31,7 @@
 ### 単位について
 - [ここ](https://opensees.berkeley.edu/OpenSees/manuals/usermanual/566.htm)を読むと、単位系については依拠しないと書かれている。
     - Metricであろうが、Imperialであろうが、どちらでも使える
-
-
+    - ただ一部の材料モデル(例えば[FRPConfinedConcrete02](https://openseespydoc.readthedocs.io/en/latest/src/FRPConfinedConcrete02.html)など)では、単位系に依存するパラメータや、単位系を引数で設定するものがあるので注意
 
 ## 2024/07/06
 
@@ -48,6 +47,9 @@
 - `op.setParameter('-val', 0, '-ele', 1, 'FirstCall', '1')`
     - Q1:`FirstCall`は何を指定している？
     - Q2:一番最後の`1`はなんの意味を持つ？
+- `op.setParameter('-val', 0.3, '-ele',1, 'poissonRatio', '1')`
+    - Q1:一番最後の`'1'`はなんの意味を持つ？
+        - しかも`1`ではなく、`'1'`でないといけない
 - `op.sp(3, 1, 1.0)`
     - Q1:なぜ3つ目の引数がfloat?
 - `SSPquadUP`について
@@ -84,6 +86,12 @@
 ### 単位について
 - [ここ](https://opensees.berkeley.edu/OpenSees/manuals/usermanual/566.htm)を読むと、単位系については依拠しないと書かれている。
     - Metricであろうが、Imperialであろうが、どちらでも使える
+
+### 追加の調べ物
+- 間隙水圧について
+    - [ここ](https://opensees.berkeley.edu/wiki/index.php/SSPquadUP_Element)によると、間隙圧のrecoderは以下のように指定するらしい
+        -  `op.recorder('Node','-file', 'CycPP.txt','-time', '-node',1,2,3,4,'-dof', 3, 'vel')`
+        - なぜ`vel`で参照するのか？
 
 
 ## 2024/07/04
