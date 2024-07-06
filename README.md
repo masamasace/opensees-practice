@@ -20,9 +20,34 @@
     - Q2:そもそもElementとは何か？
 
 ### ソースコードからの理解
-- `pip install openseespy`について
-    - `__init__.py`を見ると、プラットフォームによって、インポートするモジュールが変わるようになっている
-    - 例えば、`import openseespy.opensees as op`とすると、`openseespy/opensees.py`がインポートされる
+- そもそも`OpenSeesPy`のソースコードの構造が分からない。どこを見ればいいのか分からない
+    - `pip/openseespy/opensees/__init__.py`を見ると、プラットフォームによって、インポートするモジュールが変わるようになっている
+    - もともと`TCL`で書かれたもの
+        - `Tool Command Language`の略
+            - lammpsでも同じようなものを使ったな... 
+                - [ここ](https://docs.lammps.org/Tools.html#building-the-wrapper)を見ると、どうやらlammpsはビルド時にオプションをつけることで、ラッパーを変更できるようだ
+                    - すげえなぁ
+    - おそらく`SRC`ディレクトリを見ればよさそう
+        - ただ、pythonラッパーとの対応がよくわからない
+            - pythonで与えれた引数がどのようにTCLに渡されるのかが分からない。
+- `SRC/domain/pattern`を見る
+    - [ここ](https://github.com/zhuminjie/OpenSeesPy/blob/ac4a48f237374db7eaf2d4cd7406360b1ba670cf/SRC/domain/pattern/TclPatternCommand.cpp#L116)に`Plain`の実装がある
+    - [ここ](https://github.com/zhuminjie/OpenSeesPy/blob/ac4a48f237374db7eaf2d4cd7406360b1ba670cf/SRC/domain/pattern/TclPatternCommand.cpp#L120)に該当の情報がある
+        - 結局、`'-factor'`でも`'-fact'`でもどちらでもいいらしい
+        - 値は`float`に変換されて、変数`fact`に代入される
+- `SRC/material/nD/UWmaterials/PM4Sand.cpp`を見る
+    - ここにはPM4Sandの実装がある
+        - `m_FirstCall`と`m_PostShake`が書かれている
+    - [ここ](https://github.com/zhuminjie/OpenSeesPy/blob/ac4a48f237374db7eaf2d4cd7406360b1ba670cf/SRC/material/nD/UWmaterials/PM4Sand.cpp#L725C1-L766C2)には、`setParameter`の実装がある
+        - 用意されているのは、`FirstCall`と`PostShake`以外にもいくつかのパラメータがあるが全てではない
+        - `FirstCall`と`PostShake`は、`m_FirstCall`と`m_PostShake`に代入される
+        - PM4Sandの`initilize`関数は初期応力が定義されている場合とされていない場合で別々のものが用意されている
+            - `FirstCall`が0のとき(?、正確にはresponseIDが8のとき)、初期応力が定義されている場合の初期化が行われる。
+                - この部分の記述はあいまい。
+        - `PostShake`の場合は、現在の応力状態と累積ひずみを考慮した、砂のせん断剛性率と体積弾性係数の値を決定する。
+
+
+                -  
 - 
 
 ## 2024/07/04
